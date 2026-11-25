@@ -348,11 +348,15 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request, next caddyht
 		case 2: // http2: keep reading from "request" and writing into same response
 			fallthrough
 		case 3:
-			// Allow authenticated tunnels to remain idle for up to 24 hours.
-			// This reader belongs to this CONNECT request; hard deadlines still apply.
+			// Disable HTTP idle deadlines for this authenticated CONNECT request.
+			// Hard deadlines still apply. The upload goroutine can outlive dualStream.
 			if len(h.AuthCredentials) > 0 {
-				if reader, _ := caddyhttp.IdleTimeoutsFromContext(r.Context()); reader != nil {
-					reader.Override(86400*time.Second, 0)
+				reader, writer := caddyhttp.IdleTimeoutsFromContext(r.Context())
+				if reader != nil {
+					reader.Disable()
+				}
+				if writer != nil {
+					writer.Disable()
 				}
 			}
 			defer r.Body.Close()
